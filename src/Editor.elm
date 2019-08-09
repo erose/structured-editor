@@ -87,8 +87,8 @@ viewNode node =
 
                 onClickHandler =
                     -- We are stacking multiple spans with event handlers all on top of each other;
-                    -- hence, we need to stop propagation in our event handler. Unfortunately, this requries us to
-                    -- use a more complex API than Html.Events.onClick.
+                    -- hence, we need to stop propagation in our event handler. Unfortunately, this
+                    -- requries us to use a more complex API than Html.Events.onClick.
                     Html.Events.stopPropagationOn "click" <| Json.Decode.succeed ( DisplayValue node, True )
             in
             Html.span
