@@ -2,8 +2,9 @@ module Editor exposing (..)
 
 import Browser
 import Html exposing (Html)
-import Html.Attributes
+import Html.Attributes exposing (class, style)
 import Html.Events
+import Json.Decode
 
 
 
@@ -11,8 +12,8 @@ import Html.Events
 
 
 type Node
-    = NumNode Int
-    | FnNode Operator (List Node)
+    = NumNode Int -- Numeric literal node: e.g. '4'
+    | FnNode Operator (List Node) -- Function node: e.g. a '+' or '-' node.
 
 
 type Operator
@@ -23,7 +24,9 @@ type Operator
 
 
 type alias Model =
-    { ast : Node }
+    { -- Abstract Syntax Tree
+      ast : Node
+    }
 
 
 
@@ -70,29 +73,31 @@ view model =
 viewNode : Node -> Html Msg
 viewNode node =
     let
-        style =
-            Html.Attributes.style
-
         baseStyles =
-            [ style "margin" "5px", style "display" "inline-block", style "border-radius" "5px" ]
+            [ style "margin" "5px", style "padding-left" "2px", style "display" "inline-block", style "border-radius" "5px" ]
     in
     case node of
         FnNode operator children ->
             let
                 operatorSpan =
                     Html.span [] [ Html.text <| renderOperator operator ]
+
+                styles =
+                    style "background-color" "rgba(44, 178, 218, 0.2)" :: baseStyles
+
+                onClickHandler =
+                    -- We are stacking multiple spans with event handlers all on top of each other;
+                    -- hence, we need to stop propagation in our event handler. Unfortunately, this requries us to
+                    -- use a more complex API than Html.Events.onClick.
+                    Html.Events.stopPropagationOn "click" <| Json.Decode.succeed ( DisplayValue node, True )
             in
             Html.span
-                ([ Html.Events.onClick <| DisplayValue node
-                 , Html.Attributes.class "fn-node node"
-                 ]
-                    ++ (style "background-color" "rgba(44, 178, 218, 0.2)" :: baseStyles)
-                )
+                ([ onClickHandler, class "fn-node node" ] ++ styles)
                 ([ operatorSpan ] ++ List.map viewNode children)
 
         NumNode content ->
             Html.span
-                ([ Html.Attributes.class "num-node node" ] ++ baseStyles)
+                ([ class "num-node node" ] ++ baseStyles)
                 [ Html.span [] [ Html.text <| String.fromInt content ] ]
 
 
@@ -109,7 +114,7 @@ renderOperator operator =
             "➗"
 
         Multiply ->
-            "✖️"
+            "✖"
 
 
 displayNodeEvaluation : Node -> Cmd Msg
@@ -133,10 +138,12 @@ evaluateNode node =
                     List.sum <| List.map evaluateNode children
 
                 Subtract ->
+                    -- TODO
                     0
 
                 Multiply ->
                     List.product <| List.map evaluateNode children
 
                 Divide ->
+                    -- TODO
                     1
