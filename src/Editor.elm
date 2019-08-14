@@ -6,6 +6,7 @@ import Html exposing (Html)
 import Html.Attributes exposing (class, style)
 import Html.Events
 import Json.Decode
+import Parser exposing ((|.), (|=), Parser)
 
 
 
@@ -43,6 +44,7 @@ type alias Model =
 
 type Msg
     = DisplayValue Node
+    | ChangeExpression String
 
 
 init : flags -> ( Model, Cmd Msg )
@@ -72,6 +74,49 @@ update msg model =
         DisplayValue targetNode ->
             ( { model | selectedNode = Just targetNode }, Cmd.none )
 
+        ChangeExpression newValue ->
+            -- TODO: Handle.
+            ( { model | ast = parseToAST newValue, selectedNode = Nothing }, Cmd.none )
+
+
+
+-- Simple LISP parsing function.
+
+
+parseToAST : String -> Node
+parseToAST string =
+    case Parser.run nodeParser string of
+        Result.Ok value ->
+            value
+
+        Result.Err _ ->
+            NumNode 0
+
+
+nodeParser : Parser Node
+nodeParser =
+    Parser.oneOf [ fnNodeParser, numNodeParser ]
+
+
+fnNodeParser : Parser Node
+fnNodeParser =
+    Parser.succeed FnNode
+        |. Parser.symbol "("
+        |. Parser.spaces
+        |= Parser.oneOf [ Parser.keyword "+", Parser.keyword "*" ]
+        |. Parser.spaces
+        |= nodeParser
+        |. Parser.spaces
+        |= nodeParser
+        |. Parser.spaces
+        |. Parser.symbol ")"
+
+
+numNodeParser : Parser Node
+numNodeParser =
+    Parser.succeed NumNode
+        |= Parser.number
+
 
 view : Model -> Html Msg
 view model =
@@ -83,21 +128,29 @@ view model =
 
                 Nothing ->
                     ""
+
+        inputDiv =
+            Html.div []
+                [ Html.input [ Html.Events.onInput (\newValue -> ChangeExpression newValue) ] []
+                ]
+
+        expressionDiv =
+            Html.div [ style "display" "flex", style "align-items" "center", style "font-family" "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol'" ]
+                [ viewNode model.ast model.selectedNode 0
+                , Html.span
+                    [ style "padding" "10px"
+                    , style "margin-left" "10px"
+                    , style "background-color" orange
+                    , style "border-radius" "5px"
+                    , style "font-size" "20px"
+                    , style "min-width" "20px"
+                    , style "min-height" "20px"
+                    , style "text-align" "center"
+                    ]
+                    [ Html.text result ]
+                ]
     in
-    Html.div [ style "display" "flex", style "align-items" "center", style "font-family" "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol'" ]
-        [ viewNode model.ast model.selectedNode 0
-        , Html.span
-            [ style "padding" "10px"
-            , style "margin-left" "10px"
-            , style "background-color" orange
-            , style "border-radius" "5px"
-            , style "font-size" "20px"
-            , style "min-width" "20px"
-            , style "min-height" "20px"
-            , style "text-align" "center"
-            ]
-            [ Html.text result ]
-        ]
+    Html.div [] [ inputDiv, expressionDiv ]
 
 
 orange =
@@ -181,15 +234,6 @@ renderOperator operator =
 
         Multiply ->
             "✖"
-
-
-displayNodeEvaluation : Node -> Cmd Msg
-displayNodeEvaluation node =
-    let
-        _ =
-            Debug.log "hi" (String.fromInt <| evaluateNode node)
-    in
-    Cmd.none
 
 
 evaluateNode : Node -> Int
