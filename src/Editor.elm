@@ -48,13 +48,10 @@ type Msg
 init : flags -> ( Model, Cmd Msg )
 init _ =
     let
-        innerNode =
-            FnNode Multiply [ NumNode 3, NumNode 2 ]
-
         initialAST =
             FnNode Add
-                [ innerNode
-                , NumNode 10
+                [ FnNode Multiply [ NumNode 6245, FnNode Multiply [ FnNode Add [ NumNode 123, NumNode 456 ], NumNode 5478 ] ]
+                , NumNode 537853970
                 ]
     in
     ( { ast = initialAST, selectedNode = Nothing }, Cmd.none )
@@ -87,10 +84,24 @@ view model =
                 Nothing ->
                     ""
     in
-    Html.div []
+    Html.div [ style "display" "flex", style "align-items" "center", style "font-family" "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol'" ]
         [ viewNode model.ast model.selectedNode 0
-        , Html.div [] [ Html.text result ]
+        , Html.span
+            [ style "padding" "10px"
+            , style "margin-left" "10px"
+            , style "background-color" orange
+            , style "border-radius" "5px"
+            , style "font-size" "20px"
+            , style "min-width" "20px"
+            , style "min-height" "20px"
+            , style "text-align" "center"
+            ]
+            [ Html.text result ]
         ]
+
+
+orange =
+    "rgba(255, 165, 0, 0.5)"
 
 
 blues : Array String
@@ -98,9 +109,7 @@ blues =
     Array.fromList
         [ "rgba(196,220,255,1)"
         , "rgba(155,194,251,1)"
-        , "rgba(155,194,251,1)"
-        , "rgba(255,255,255,1)"
-        , "rgba(255,255,255,1)"
+        , "rgba(206, 228, 255, 1)"
         ]
 
 
@@ -124,9 +133,6 @@ viewNode node selectedNode depth =
                     -- blues array.
                     Maybe.withDefault "rgb( 0,0,0,)" <| Array.get (remainderBy (Array.length blues) depth) blues
 
-                orange =
-                    "rgba(255, 165, 0, 0.5)"
-
                 backgroundColor =
                     case selectedNode of
                         Just n ->
@@ -139,8 +145,11 @@ viewNode node selectedNode depth =
                         Nothing ->
                             blue
 
+                stylesForNodesWithChildren =
+                    [ style "background-color" backgroundColor, style "border" "thin solid rgb(179, 213, 255)" ]
+
                 styles =
-                    style "background-color" backgroundColor :: baseStyles
+                    stylesForNodesWithChildren ++ baseStyles
 
                 onClickHandler =
                     -- We are stacking multiple spans with event handlers all on top of each other;
