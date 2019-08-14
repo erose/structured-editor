@@ -10,7 +10,8 @@ import Json.Decode
 
 
 -- TODOS
--- highlighting, show results
+-- show results
+-- un-highlight
 -- user input
 -- subtraction and division
 -- arithmetic -> lisp
@@ -77,7 +78,19 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-    Html.div [] [ viewNode model.ast model.selectedNode 0 ]
+    let
+        result =
+            case model.selectedNode of
+                Just node ->
+                    String.fromInt <| evaluateNode node
+
+                Nothing ->
+                    ""
+    in
+    Html.div []
+        [ viewNode model.ast model.selectedNode 0
+        , Html.div [] [ Html.text result ]
+        ]
 
 
 blues : Array String
