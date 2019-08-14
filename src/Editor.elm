@@ -1,5 +1,6 @@
 module Editor exposing (..)
 
+import Array exposing (Array)
 import Browser
 import Html exposing (Html)
 import Html.Attributes exposing (class, style)
@@ -7,14 +8,14 @@ import Html.Events
 import Json.Decode
 
 
+
 -- TODOS
 -- highlighting, show results
 -- user input
 -- subtraction and division
 -- arithmetic -> lisp
-
-
 -- MODEL
+
 
 type Node
     = NumNode Int -- Numeric literal node: e.g. '4'
@@ -30,9 +31,11 @@ type Operator
 
 type alias Model =
     { -- Abstract Syntax Tree
-      ast : Node,
-      selectedNode: Maybe Node
+      ast : Node
+    , selectedNode : Maybe Node
     }
+
+
 
 -- MSG
 
@@ -44,15 +47,16 @@ type Msg
 init : flags -> ( Model, Cmd Msg )
 init _ =
     let
-        innerNode = FnNode Multiply [ NumNode 3, NumNode 2 ]
+        innerNode =
+            FnNode Multiply [ NumNode 3, NumNode 2 ]
+
         initialAST =
             FnNode Add
-                [
-                    innerNode,
-                    NumNode 10
+                [ innerNode
+                , NumNode 10
                 ]
     in
-    ( { ast = initialAST, selectedNode = Just innerNode }, Cmd.none )
+    ( { ast = initialAST, selectedNode = Nothing }, Cmd.none )
 
 
 main : Program () Model Msg
@@ -68,21 +72,33 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         DisplayValue targetNode ->
-            ( model, displayNodeEvaluation targetNode )
+            ( { model | selectedNode = Just targetNode }, Cmd.none )
 
 
 view : Model -> Html Msg
 view model =
-    Html.div [] [ viewNode model.ast model.selectedNode ]
+    Html.div [] [ viewNode model.ast model.selectedNode 0 ]
 
 
-viewNode : Node -> Maybe Node -> Html Msg
-viewNode node selectedNode =
+blues : Array String
+blues =
+    Array.fromList
+        [ "rgba(196,220,255,1)"
+        , "rgba(155,194,251,1)"
+        , "rgba(155,194,251,1)"
+        , "rgba(255,255,255,1)"
+        , "rgba(255,255,255,1)"
+        ]
+
+
+viewNode : Node -> Maybe Node -> Int -> Html Msg
+viewNode node selectedNode depth =
     let
         baseStyles =
             [ style "font-size" "30px", style "margin" "8px", style "padding-left" "5px", style "display" "inline-block", style "border-radius" "5px" ]
-        
-        viewChild childNode = viewNode childNode selectedNode
+
+        viewChild childNode =
+            viewNode childNode selectedNode (depth + 1)
     in
     case node of
         FnNode operator children ->
@@ -90,11 +106,25 @@ viewNode node selectedNode =
                 operatorSpan =
                     Html.span [] [ Html.text <| renderOperator operator ]
 
-                blue = "rgba(44, 178, 218, 0.2)"
-                orange = "rgba(255, 165, 0, 0.5)"
-                backgroundColor = case selectedNode of
-                    Just n -> if node == n then orange else blue
-                    Nothing -> blue
+                blue =
+                    -- Default case should never happen, as we are modding by the length of the
+                    -- blues array.
+                    Maybe.withDefault "rgb( 0,0,0,)" <| Array.get (remainderBy (Array.length blues) depth) blues
+
+                orange =
+                    "rgba(255, 165, 0, 0.5)"
+
+                backgroundColor =
+                    case selectedNode of
+                        Just n ->
+                            if node == n then
+                                orange
+
+                            else
+                                blue
+
+                        Nothing ->
+                            blue
 
                 styles =
                     style "background-color" backgroundColor :: baseStyles
