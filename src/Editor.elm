@@ -11,17 +11,14 @@ import Parser exposing ((|.), (|=), Parser)
 
 
 -- TODOS
--- show results
 -- un-highlight
--- user input
--- subtraction and division
 -- arithmetic -> lisp
 -- MODEL
 
 
 type Node
     = NumNode Int -- Numeric literal node: e.g. '4'
-    | FnNode Operator (List Node) -- Function node: e.g. a '+' or '-' node.
+    | FnNode Operator Node Node -- Function node: e.g. a '+' or '-' node.
 
 
 type Operator
@@ -33,8 +30,8 @@ type Operator
 
 type alias Model =
     { -- Abstract Syntax Tree
-      ast : Node
-    , selectedNode : Maybe Node
+      selectedNode : Maybe Node
+    , currentInput : String
     }
 
 
@@ -44,19 +41,16 @@ type alias Model =
 
 type Msg
     = DisplayValue Node
-    | ChangeExpression String
+    | ChangeInput String
 
 
 init : flags -> ( Model, Cmd Msg )
 init _ =
     let
-        initialAST =
-            FnNode Add
-                [ FnNode Multiply [ NumNode 6245, FnNode Multiply [ FnNode Add [ NumNode 123, NumNode 456 ], NumNode 5478 ] ]
-                , NumNode 537853970
-                ]
+        initialInput =
+            "(+ 3 (* 8 6))"
     in
-    ( { ast = initialAST, selectedNode = Nothing }, Cmd.none )
+    ( { currentInput = initialInput, selectedNode = Nothing }, Cmd.none )
 
 
 main : Program () Model Msg
@@ -74,9 +68,8 @@ update msg model =
         DisplayValue targetNode ->
             ( { model | selectedNode = Just targetNode }, Cmd.none )
 
-        ChangeExpression newValue ->
-            -- TODO: Handle.
-            ( { model | ast = parseToAST newValue, selectedNode = Nothing }, Cmd.none )
+        ChangeInput newValue ->
+            ( { model | currentInput = newValue, selectedNode = Nothing }, Cmd.none )
 
 
 
@@ -103,19 +96,30 @@ fnNodeParser =
     Parser.succeed FnNode
         |. Parser.symbol "("
         |. Parser.spaces
-        |= Parser.oneOf [ Parser.keyword "+", Parser.keyword "*" ]
+        |= operatorParser
         |. Parser.spaces
-        |= nodeParser
+        -- We need to use Parser.lazy here because nodeParser recursively calls fnNodeParser.
+        |= Parser.lazy (\_ -> nodeParser)
         |. Parser.spaces
-        |= nodeParser
+        |= Parser.lazy (\_ -> nodeParser)
         |. Parser.spaces
         |. Parser.symbol ")"
+
+
+operatorParser : Parser Operator
+operatorParser =
+    Parser.oneOf
+        [ Parser.map (\_ -> Add) <| Parser.keyword "+"
+        , Parser.map (\_ -> Subtract) <| Parser.keyword "-"
+        , Parser.map (\_ -> Divide) <| Parser.keyword "/"
+        , Parser.map (\_ -> Multiply) <| Parser.keyword "*"
+        ]
 
 
 numNodeParser : Parser Node
 numNodeParser =
     Parser.succeed NumNode
-        |= Parser.number
+        |= Parser.int
 
 
 view : Model -> Html Msg
@@ -131,12 +135,19 @@ view model =
 
         inputDiv =
             Html.div []
-                [ Html.input [ Html.Events.onInput (\newValue -> ChangeExpression newValue) ] []
+                [ Html.input
+                    [ Html.Attributes.attribute "value" model.currentInput
+                    , Html.Events.onInput (\newValue -> ChangeInput newValue)
+                    ]
+                    []
                 ]
+
+        ast =
+            parseToAST model.currentInput
 
         expressionDiv =
             Html.div [ style "display" "flex", style "align-items" "center", style "font-family" "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol'" ]
-                [ viewNode model.ast model.selectedNode 0
+                [ viewNode ast model.selectedNode 0
                 , Html.span
                     [ style "padding" "10px"
                     , style "margin-left" "10px"
@@ -176,7 +187,7 @@ viewNode node selectedNode depth =
             viewNode childNode selectedNode (depth + 1)
     in
     case node of
-        FnNode operator children ->
+        FnNode operator left right ->
             let
                 operatorSpan =
                     Html.span [] [ Html.text <| renderOperator operator ]
@@ -212,7 +223,7 @@ viewNode node selectedNode depth =
             in
             Html.span
                 ([ onClickHandler, class "fn-node node" ] ++ styles)
-                ([ operatorSpan ] ++ List.map viewChild children)
+                [ operatorSpan, viewChild left, viewChild right ]
 
         NumNode content ->
             Html.span
@@ -242,18 +253,16 @@ evaluateNode node =
         NumNode content ->
             content
 
-        FnNode operator children ->
+        FnNode operator left right ->
             case operator of
                 Add ->
-                    List.sum <| List.map evaluateNode children
+                    evaluateNode left + evaluateNode right
 
                 Subtract ->
-                    -- TODO
-                    0
+                    evaluateNode left - evaluateNode right
 
                 Multiply ->
-                    List.product <| List.map evaluateNode children
+                    evaluateNode left * evaluateNode right
 
                 Divide ->
-                    -- TODO
-                    1
+                    evaluateNode left // evaluateNode right
