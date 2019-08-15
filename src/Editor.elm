@@ -11,7 +11,6 @@ import Parser exposing ((|.), (|=), Parser)
 
 
 -- TODOS
--- un-highlight
 -- arithmetic -> lisp
 -- MODEL
 
@@ -41,6 +40,7 @@ type alias Model =
 
 type Msg
     = DisplayValue Node
+    | StopDisplayingValue
     | ChangeInput String
 
 
@@ -67,6 +67,9 @@ update msg model =
     case msg of
         DisplayValue targetNode ->
             ( { model | selectedNode = Just targetNode }, Cmd.none )
+
+        StopDisplayingValue ->
+            ( { model | selectedNode = Nothing }, Cmd.none )
 
         ChangeInput newValue ->
             ( { model | currentInput = newValue, selectedNode = Nothing }, Cmd.none )
@@ -215,14 +218,18 @@ viewNode node selectedNode depth =
                 styles =
                     stylesForNodesWithChildren ++ baseStyles
 
-                onClickHandler =
-                    -- We are stacking multiple spans with event handlers all on top of each other;
-                    -- hence, we need to stop propagation in our event handler. Unfortunately, this
-                    -- requries us to use a more complex API than Html.Events.onClick.
+                -- We are stacking multiple spans with event handlers all on top of each other;
+                -- hence, we need to stop propagation in our event handler. Unfortunately, this
+                -- requries us to use a more complex API than Html.Events.onClick in both these
+                -- handlers.
+                mouseOverHandler =
                     Html.Events.stopPropagationOn "mouseover" <| Json.Decode.succeed ( DisplayValue node, True )
+
+                mouseOutHandler =
+                    Html.Events.stopPropagationOn "mouseout" <| Json.Decode.succeed ( StopDisplayingValue, True )
             in
             Html.span
-                ([ onClickHandler, class "fn-node node" ] ++ styles)
+                ([ mouseOverHandler, mouseOutHandler, class "fn-node node" ] ++ styles)
                 [ operatorSpan, viewChild left, viewChild right ]
 
         NumNode content ->
